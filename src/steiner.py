@@ -1,7 +1,7 @@
 import networkx as nx
-
 import math
 import itertools as iter
+import random as rnd
 
 
 class TOPTGraph(nx.Graph):
@@ -46,8 +46,28 @@ class TOPTGraph(nx.Graph):
 
 
 class SteinerTree:
+    def __init__(self, T_max=1.0, T_min=0.00001, cooling_factor=0.9, number_of_iterations=100):
+        self.T_max = T_max
+        self.T_min = T_min
+        self.cooling_factor = cooling_factor
+        self.number_of_iterations = number_of_iterations
+
     def find_steiner_tree(self, input_graph):
         possible_solutions = self.__get_set_of_possible_solutions(input_graph)
+
+        solution = self.__get_random_solution(possible_solutions)
+        cost = self.__get_cost(solution)
+
+        current_temperature = self.T_max
+        while current_temperature > self.T_min:
+            new_solution = self.__get_random_solution(possible_solutions)
+            new_cost = self.__get_cost(new_solution)
+            aceptance_point = math.exp((cost - new_cost) / current_temperature)
+            if aceptance_point > rnd.random():
+                solution = new_solution
+                cost = new_cost
+            current_temperature = current_temperature * self.cooling_factor
+        return solution, cost
 
     def __get_set_of_possible_solutions(self, input_graph):
         hanan_points = input_graph.get_hanan_points()
@@ -56,8 +76,9 @@ class SteinerTree:
         for set in hanan_sets:
             copied_graph = input_graph.copy()
             copied_graph.apply_terminal_points(set)
+            # mst = nx.minimum_spanning_tree(copied_graph)
             possible_solutions.append(copied_graph)
-
+        rnd.shuffle(possible_solutions)
         return possible_solutions
 
     def __get_cost(self, mst):
@@ -66,6 +87,11 @@ class SteinerTree:
         for edge in edges:
             cost += edge[2]['weight']
         return cost
+
+    def __get_random_solution(self, solutions):
+        length = len(solutions)
+        random = rnd.choice(xrange(0, length))
+        return nx.minimum_spanning_tree(solutions[random])
 
 
 def get_power_set(iterable):
