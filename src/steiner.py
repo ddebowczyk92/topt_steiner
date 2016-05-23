@@ -30,6 +30,30 @@ class TOPTGraph(nx.Graph):
 
         return hanan_points
 
+    def get_pseudofermat_points(self, limit):
+        pseudofermat_points = []
+        node_positions = nx.get_node_attributes(self, 'pos').values()
+        combinations = list(iter.combinations(node_positions, 3))
+        node_count = limit if limit < len(combinations) else len(combinations)
+
+        sample = rnd.sample(combinations, node_count)
+        for comb in sample:
+            counted_point = self.__count_pseudofermat_point_position(comb)
+            pseudofermat_points.append(counted_point)
+        return pseudofermat_points
+
+    def __count_pseudofermat_point_position(self, combination):
+        pseudofermat_point = PseudofermatPoint()
+        x = 0
+        y = 0
+        for point in combination:
+            x += point[0]
+            y += point[1]
+        pseudofermat_point.x = x/len(combination)
+        pseudofermat_point.y = y/len(combination)
+        pseudofermat_point.associated_nodes = combination
+        return pseudofermat_point
+
     def apply_terminal_points(self, terminals):
 
         for terminal in terminals:
@@ -93,6 +117,11 @@ class SteinerTree:
         random = rnd.choice(xrange(0, length))
         return nx.minimum_spanning_tree(solutions[random])
 
+class PseudofermatPoint:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+        self.associated_nodes = []
 
 def get_power_set(iterable):
     s = list(iterable)
