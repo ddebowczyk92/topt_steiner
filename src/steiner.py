@@ -43,15 +43,16 @@ class TOPTGraph(nx.Graph):
         return pseudofermat_points
 
     def __count_pseudofermat_point_position(self, combination):
-        pseudofermat_point = PseudofermatPoint()
         x = 0
         y = 0
         for point in combination:
             x += point[0]
             y += point[1]
-        pseudofermat_point.x = x/len(combination)
-        pseudofermat_point.y = y/len(combination)
-        pseudofermat_point.associated_nodes = combination
+        x /= len(combination)
+        y /= len(combination)
+
+        pseudofermat_point = (
+            'F(' + '%.2f' % x + ',' + '%.2f' % y + ')', {'pos': (x, y), 'color': 'blue'})
         return pseudofermat_point
 
     def apply_terminal_points(self, terminals):
@@ -94,16 +95,26 @@ class SteinerTree:
         return solution, cost
 
     def __get_set_of_possible_solutions(self, input_graph):
-        hanan_points = input_graph.get_hanan_points()
-        hanan_sets = get_power_set(hanan_points)
+        # added_points_sets = self.__get_hanan_solution_sets(input_graph)
+        added_points_sets = self.__get_fermat_solution_sets(input_graph, 200)
         possible_solutions = []
-        for set in hanan_sets:
+        for set in added_points_sets:
             copied_graph = input_graph.copy()
             copied_graph.apply_terminal_points(set)
             # mst = nx.minimum_spanning_tree(copied_graph)
             possible_solutions.append(copied_graph)
         rnd.shuffle(possible_solutions)
         return possible_solutions
+
+    def __get_hanan_solution_sets(self, input_graph):
+        hanan_points = input_graph.get_hanan_points()
+        added_points_sets = get_power_set(hanan_points)
+        return added_points_sets
+
+    def __get_fermat_solution_sets(self, input_graph, limit):
+        pseudofermat_points = input_graph.get_pseudofermat_points(limit)
+        added_points_sets = get_fermat_set(pseudofermat_points, len(input_graph.nodes())-2, 500)
+        return added_points_sets
 
     def __get_cost(self, mst):
         edges = mst.edges(data=True)
@@ -117,12 +128,16 @@ class SteinerTree:
         random = rnd.choice(xrange(0, length))
         return nx.minimum_spanning_tree(solutions[random])
 
-class PseudofermatPoint:
-    def __init__(self):
-        self.x = 0
-        self.y = 0
-        self.associated_nodes = []
 
 def get_power_set(iterable):
     s = list(iterable)
     return list(iter.chain.from_iterable(iter.combinations(s, r) for r in range(len(s) + 1)))
+
+
+def get_fermat_set(iterable, set_size, returned_sets_count):
+    fermat_sets = []
+    while len(fermat_sets) < returned_sets_count:
+        comb = rnd.sample(iterable, set_size)
+        fermat_sets.append(comb)
+
+    return fermat_sets
