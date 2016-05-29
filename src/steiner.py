@@ -2,7 +2,7 @@ import networkx as nx
 import math
 import itertools as iter
 import random as rnd
-
+import re
 
 class TOPTGraph(nx.Graph):
     def add_node_with_position(self, node_number, x, y):
@@ -80,19 +80,60 @@ class SteinerTree:
     def find_steiner_tree(self, input_graph):
         possible_solutions = self.__get_set_of_possible_solutions(input_graph)
 
-        solution = self.__get_random_solution(possible_solutions)
+        solution, solution_graph = self.__get_random_solution(possible_solutions)
+        best_solution_graph = solution_graph
         cost = self.__get_cost(solution)
 
         current_temperature = self.T_max
         while current_temperature > self.T_min:
-            new_solution = self.__get_random_solution(possible_solutions)
+            new_solution, solution_graph = self.__get_random_solution(possible_solutions)
             new_cost = self.__get_cost(new_solution)
             aceptance_point = math.exp((cost - new_cost) / current_temperature)
             if aceptance_point > rnd.random():
                 solution = new_solution
+                best_solution_graph = solution_graph
                 cost = new_cost
             current_temperature = current_temperature * self.cooling_factor
-        return solution, cost
+
+        best_solution = solution
+        best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution_graph)
+        print 'First annealing: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
+
+        current_temperature = self.T_max
+        while current_temperature > self.T_min:
+            new_solution, solution_graph = self.__remove_random_fermat_point(best_solution_graph, best_solution_fermat_points)
+            new_cost = self.__get_cost(new_solution)
+            cost_diff = cost - new_cost
+            try:
+                aceptance_point = math.exp((cost_diff) / current_temperature)
+            except OverflowError:
+                print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
+            if aceptance_point > 2:
+                best_solution = new_solution
+                best_solution_graph = solution_graph
+                best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution)
+                cost = new_cost
+            current_temperature = current_temperature * self.cooling_factor
+
+        print 'Second annealing: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
+        return best_solution, cost
+
+    def __remove_random_fermat_point(self, input_graph, fermat_points):
+        graph = input_graph.copy()
+        points_count = len(fermat_points)
+        if points_count > 1:
+            point_to_delete = fermat_points[rnd.randint(0, points_count-1)]
+            graph.remove_node(point_to_delete)
+            if nx.is_connected(graph):
+                return nx.minimum_spanning_tree(graph), graph
+        return nx.minimum_spanning_tree(input_graph), input_graph
+
+    def __get_fermat_points_from_graph(self, graph):
+        points = []
+        for node_name in graph.nodes():
+            if re.search('F\(', node_name):
+                points.append(node_name)
+        return points
 
     def __get_set_of_possible_solutions(self, input_graph):
         # added_points_sets = self.__get_hanan_solution_sets(input_graph)
@@ -126,7 +167,7 @@ class SteinerTree:
     def __get_random_solution(self, solutions):
         length = len(solutions)
         random = rnd.choice(xrange(0, length))
-        return nx.minimum_spanning_tree(solutions[random])
+        return nx.minimum_spanning_tree(solutions[random]), solutions[random]
 
 
 def get_power_set(iterable):
