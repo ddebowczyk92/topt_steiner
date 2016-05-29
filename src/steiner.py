@@ -88,7 +88,12 @@ class SteinerTree:
         while current_temperature > self.T_min:
             new_solution, solution_graph = self.__get_random_solution(possible_solutions)
             new_cost = self.__get_cost(new_solution)
-            aceptance_point = math.exp((cost - new_cost) / current_temperature)
+            cost_diff = cost - new_cost
+            aceptance_point = 0
+            try:
+                aceptance_point = math.exp((cost_diff) / current_temperature)
+            except OverflowError:
+                print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
             if aceptance_point > rnd.random():
                 solution = new_solution
                 best_solution_graph = solution_graph
@@ -104,11 +109,12 @@ class SteinerTree:
             new_solution, solution_graph = self.__remove_random_fermat_point(best_solution_graph, best_solution_fermat_points)
             new_cost = self.__get_cost(new_solution)
             cost_diff = cost - new_cost
+            aceptance_point = 0
             try:
                 aceptance_point = math.exp((cost_diff) / current_temperature)
             except OverflowError:
                 print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
-            if aceptance_point > 2:
+            if aceptance_point > rnd.uniform(1.75, 3):
                 best_solution = new_solution
                 best_solution_graph = solution_graph
                 best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution)
