@@ -122,6 +122,8 @@ class SteinerTree:
             current_temperature = current_temperature * self.cooling_factor
 
         print 'Second annealing: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
+        best_solution, cost = self.__remove_hanging_fermats(best_solution)
+        print 'Last cost: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
         return best_solution, cost
 
     def __remove_random_fermat_point(self, input_graph, fermat_points):
@@ -169,6 +171,19 @@ class SteinerTree:
         for edge in edges:
             cost += edge[2]['weight']
         return cost
+
+    def __remove_hanging_fermats(self, graph):
+        nodes_to_remove = []
+        for edge in graph.edge.iteritems():
+            if re.search('F\(', edge[0]) and len(edge[1]) < 2:
+                nodes_to_remove.append(edge[0])
+
+        print nodes_to_remove
+
+        for node in nodes_to_remove:
+            graph.remove_node(node)
+
+        return graph, self.__get_cost(graph)
 
     def __get_random_solution(self, solutions):
         length = len(solutions)
