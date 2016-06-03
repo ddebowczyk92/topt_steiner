@@ -190,7 +190,6 @@ class SteinerTree:
         random = rnd.choice(xrange(0, length))
         return nx.minimum_spanning_tree(solutions[random]), solutions[random]
 
-
 def get_power_set(iterable):
     s = list(iterable)
     return list(iter.chain.from_iterable(iter.combinations(s, r) for r in range(len(s) + 1)))

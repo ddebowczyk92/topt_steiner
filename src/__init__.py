@@ -1,11 +1,12 @@
 from steiner import *
 import matplotlib.pyplot as plt
+from toptgui import TOPTGui
+from Tkinter import Tk
 
 
 
 
-
-def main():
+def steiner_sim_main():
     graph = TOPTGraph()
     graph.add_node_with_position('1', 0.2, 0.3)
     graph.add_node_with_position('2', 0.5, 0.6)
@@ -25,17 +26,7 @@ def main():
     graph.add_node_with_position('16', 0.15, 1.2)
     graph.add_node_with_position('17', 0.8, 0.1)
     graph.add_node_with_position('18', 0.31, 1.7)
-    # graph.add_euclidian_edge('1', '5')
-    # graph.add_euclidian_edge('2', '6')
-    # graph.add_euclidian_edge('1', '3')
-    # graph.add_euclidian_edge('1', '2')
-    # graph.add_euclidian_edge('3', '4')
-    # graph.add_euclidian_edge('3', '4')
-    # graph.add_euclidian_edge('2', '6')
-    # graph.add_euclidian_edge('1', '6')
-    # graph.add_euclidian_edge('4', '5')
-    # graph.add_euclidian_edge('4', '2')
-    # graph.add_euclidian_edge('2', '5')
+
 
 
 
@@ -51,6 +42,11 @@ def main():
     plt.show()
     print cost
 
+
+def main():
+    root = Tk()
+    gui = TOPTGui(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
