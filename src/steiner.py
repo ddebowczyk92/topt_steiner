@@ -81,52 +81,64 @@ class SteinerTree:
         possible_solutions = self.__get_set_of_possible_solutions(input_graph)
 
         solution, solution_graph = self.__get_random_solution(possible_solutions)
-        best_solution_graph = solution_graph
-        cost = self.__get_cost(solution)
+        best_solution, best_solution_graph = self.__simulate_annealing(solution,
+                                                                       solution_graph,
+                                                                       self.__get_random_solution,
+                                                                       rnd.random,
+                                                                       possible_solutions)
 
-        current_temperature = self.T_max
-        while current_temperature > self.T_min:
-            new_solution, solution_graph = self.__get_random_solution(possible_solutions)
-            new_cost = self.__get_cost(new_solution)
-            cost_diff = cost - new_cost
-            aceptance_point = 0
-            try:
-                aceptance_point = math.exp((cost_diff) / current_temperature)
-            except OverflowError:
-                print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
-            if aceptance_point > rnd.random():
-                solution = new_solution
-                best_solution_graph = solution_graph
-                cost = new_cost
-            current_temperature = current_temperature * self.cooling_factor
-
-        best_solution = solution
+        cost = self.__get_cost(best_solution)
         best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution_graph)
         print 'First annealing: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
 
-        current_temperature = self.T_max
-        while current_temperature > self.T_min:
-            new_solution, solution_graph = self.__remove_random_fermat_point(best_solution_graph, best_solution_fermat_points)
-            new_cost = self.__get_cost(new_solution)
-            cost_diff = cost - new_cost
-            aceptance_point = 0
-            try:
-                aceptance_point = math.exp((cost_diff) / current_temperature)
-            except OverflowError:
-                print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
-            if aceptance_point > rnd.uniform(1.75, 3):
-                best_solution = new_solution
-                best_solution_graph = solution_graph
-                best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution)
-                cost = new_cost
-            current_temperature = current_temperature * self.cooling_factor
+        best_solution, best_solution_graph = self.__simulate_annealing(best_solution,
+                                                                       best_solution_graph,
+                                                                       self.__remove_random_fermat_point,
+                                                                       self.__get_acceptance_point_for_removing_fermats,
+                                                                       best_solution_graph)
+        cost = self.__get_cost(best_solution)
 
+        best_solution_fermat_points = self.__get_fermat_points_from_graph(best_solution)
         print 'Second annealing: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
         best_solution, cost = self.__remove_hanging_fermats(best_solution)
+        best_solution, cost = self.__remove_fermats_with_two_connections(best_solution)
         print 'Last cost: ' + str(len(best_solution_fermat_points)) + ' pseudofermat points. Cost: ' + str(cost)
         return best_solution, cost
 
-    def __remove_random_fermat_point(self, input_graph, fermat_points):
+    def __simulate_annealing(self,
+                             start_solution,
+                             start_solution_graph,
+                             solution_provider_function,
+                             acceptance_point_function,
+                             *solution_provider_args):
+
+        best_solution = start_solution
+        best_solution_graph = start_solution_graph
+        cost = self.__get_cost(start_solution)
+
+        current_temperature = self.T_max
+        while current_temperature > self.T_min:
+            new_solution, new_solution_graph = solution_provider_function(*solution_provider_args)
+            new_cost = self.__get_cost(new_solution)
+            cost_diff = cost - new_cost
+            acceptance_point = 0
+            try:
+                acceptance_point = math.exp((cost_diff) / current_temperature)
+            except OverflowError:
+                print 'cost - new_cost: ' + str(cost_diff) + ', current_temp: ' + str(current_temperature)
+            if acceptance_point > acceptance_point_function():
+                best_solution = new_solution
+                best_solution_graph = new_solution_graph
+                cost = new_cost
+            current_temperature = current_temperature * self.cooling_factor
+
+        return best_solution, best_solution_graph
+
+    def __get_acceptance_point_for_removing_fermats(self):
+        return rnd.uniform(1.75, 3)
+
+    def __remove_random_fermat_point(self, input_graph):
+        fermat_points = self.__get_fermat_points_from_graph(input_graph)
         graph = input_graph.copy()
         points_count = len(fermat_points)
         if points_count > 1:
@@ -174,28 +186,39 @@ class SteinerTree:
 
     def __remove_hanging_fermats(self, graph):
         nodes_to_remove = []
-        edges_to_add = []
+
         for edge in graph.edge.iteritems():
             if re.search('F\(', edge[0]) and len(edge[1]) < 2:
                 nodes_to_remove.append(edge[0])
-            if re.search('F\(', edge[0]) and len(edge[1]) == 2:
-                nodes_to_remove.append(edge[0])
-                edges_to_add.append((edge[1].keys()[0], edge[1].keys()[1]))
-
 
         print nodes_to_remove
-        print edges_to_add
 
         for node in nodes_to_remove:
             graph.remove_node(node)
+        return graph, self.__get_cost(graph)
 
-        for edge in edges_to_add:
-            start_position = nx.get_node_attributes(graph, 'pos')[edge[0]]
-            end_position = nx.get_node_attributes(graph, 'pos')[edge[1]]
-            weight = self.euc_2d(start_position[0], start_position[1], end_position[0], end_position[1])
-            graph.add_edge(edge[0], edge[1], weight=weight)
+    def __remove_fermats_with_two_connections(self, graph):
+        while True:
+            node_to_remove, edge_to_insert = self.__find_replacement_edge(graph)
+            if node_to_remove is None or edge_to_insert is None:
+                break
+            else:
+                graph.remove_node(node_to_remove)
+                start_position = nx.get_node_attributes(graph, 'pos')[edge_to_insert[0]]
+                end_position = nx.get_node_attributes(graph, 'pos')[edge_to_insert[1]]
+                weight = self.euc_2d(start_position[0], start_position[1], end_position[0], end_position[1])
+                graph.add_edge(edge_to_insert[0], edge_to_insert[1], weight=weight)
 
         return graph, self.__get_cost(graph)
+
+    def __find_replacement_edge(self, graph):
+        for edge in graph.edge.iteritems():
+            print edge
+            if re.search('F\(', edge[0]) and len(edge[1]) == 2:
+                print 'END'
+                return edge[0], (edge[1].keys()[0], edge[1].keys()[1]),
+        print 'END NONE'
+        return None, None
 
     def __get_random_solution(self, solutions):
         length = len(solutions)
