@@ -174,14 +174,26 @@ class SteinerTree:
 
     def __remove_hanging_fermats(self, graph):
         nodes_to_remove = []
+        edges_to_add = []
         for edge in graph.edge.iteritems():
             if re.search('F\(', edge[0]) and len(edge[1]) < 2:
                 nodes_to_remove.append(edge[0])
+            if re.search('F\(', edge[0]) and len(edge[1]) == 2:
+                nodes_to_remove.append(edge[0])
+                edges_to_add.append((edge[1].keys()[0], edge[1].keys()[1]))
+
 
         print nodes_to_remove
+        print edges_to_add
 
         for node in nodes_to_remove:
             graph.remove_node(node)
+
+        for edge in edges_to_add:
+            start_position = nx.get_node_attributes(graph, 'pos')[edge[0]]
+            end_position = nx.get_node_attributes(graph, 'pos')[edge[1]]
+            weight = self.euc_2d(start_position[0], start_position[1], end_position[0], end_position[1])
+            graph.add_edge(edge[0], edge[1], weight=weight)
 
         return graph, self.__get_cost(graph)
 
@@ -189,6 +201,11 @@ class SteinerTree:
         length = len(solutions)
         random = rnd.choice(xrange(0, length))
         return nx.minimum_spanning_tree(solutions[random]), solutions[random]
+
+    def euc_2d(self, x1, y1, x2, y2):
+        weight = math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
+        return weight
+
 
 def get_power_set(iterable):
     s = list(iterable)
