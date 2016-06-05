@@ -1,5 +1,7 @@
-from Tkinter import Canvas, Tk, Frame, Button, RAISED, TOP, StringVar, Label, RIGHT, RIDGE, LEFT, BOTTOM
+from Tkinter import *
 from steiner import TOPTGraph, SteinerTree
+import tkSimpleDialog
+import tkMessageBox
 import math
 import itertools
 import sys
@@ -91,10 +93,23 @@ class GuiLine:
         return self.points[1]
 
 
+class WaitDialog(tkSimpleDialog.Dialog):
+    def __init__(self, parent, title, message):
+        self.message = message
+        tkSimpleDialog.Dialog.__init__(self, parent, title=title)
+
+    def body(self, master):
+        Label(self, text=self.message).pack()
+
+    def buttonbox(self):
+        pass
+
+
 class TOPTGui(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent)
         # master = Canvas(self)
+        self.root = parent
         self.master.resizable(width=False, height=False)
         self.canvas = Canvas(self.master, width=GuiConfig.GUI_WIDTH,
                              height=GuiConfig.GUI_HEIGHT, bd=2, relief=RIDGE, bg='#2c3e50')
@@ -105,12 +120,26 @@ class TOPTGui(Frame):
         self.clear_button.configure(width=9)
         self.clear_button.pack(side=TOP)
 
+        separator = Frame(self.but_frame, height=10, bd=1)
+        separator.pack(fill=X, padx=5, pady=5)
+
         self.compute_button = Button(self.but_frame, text="Compute", command=self.start_computing)
         self.compute_button.configure(width=9)
         self.compute_button.pack()
 
+        separator = Frame(self.but_frame, height=10, bd=1)
+        separator.pack(fill=X, padx=5, pady=5)
+
+        self.info_text = StringVar()
+        self.info_text.set("Add OLT")
+        info_label = Label(self.but_frame, textvariable=self.info_text)
+        info_label.pack()
+        self.info_label = Label()
+
+
+
         self.canvas.pack(side=LEFT, expand=0)
-        self.but_frame.pack(side=RIGHT, expand=0)
+        self.but_frame.pack(anchor = E, side=RIGHT, padx=5, pady=5)
 
         self.points = {}
         self.edges = []
@@ -119,17 +148,22 @@ class TOPTGui(Frame):
         self.olt_point_id = None
 
         self.queue = Queue.Queue()
-        self.lock_object = object();
+        self.lock_object = object()
+
+        self.computed = False
 
     def __add_point(self, x, y):
         point = None
         id = str(self.id_atomic.next())
         if (self.olt_added):
             point = ONUPoint(id, x, y)
+
         else:
+
             point = OLTPoint(id, x, y)
             self.olt_added = True
             self.olt_point_id = id
+            self.info_text.set("Add ONU")
 
         self.canvas.create_oval(x - point.radius, y - point.radius, x + point.radius,
                                 y + point.radius, outline=point.outline, fill=point.fill, width=3)
@@ -145,10 +179,12 @@ class TOPTGui(Frame):
     def add_mouse_point(self, event):
         addpt = True
         if self.points == {}:
-            if (event.x < GuiConfig.POINT_RADIUS) and (event.x >= GuiConfig.GUI_WIDTH) \
-                    and (event.y < GuiConfig.POINT_RADIUS) and (event.y >= GuiConfig.GUI_HEIGHT):
+            if (event.x < 0) and (event.x >= GuiConfig.GUI_WIDTH) \
+                    and (event.y < 2 * GuiConfig.POINT_RADIUS) and (event.y >= GuiConfig.GUI_HEIGHT):
                 addpt = False
         else:
+            if self.computed:
+                addpt = False
             for id, pt in self.points.items():
                 dist = math.sqrt(pow((event.x - pt.x), 2) + pow((event.y - pt.y), 2))
                 if dist < 2 * (GuiConfig.POINT_RADIUS + GuiConfig.POINT_OUTLINE):
@@ -166,20 +202,29 @@ class TOPTGui(Frame):
         self.olt_added = False
         self.olt_point_id = None
 
+        self.info_text.set("Add OLT")
+
         self.canvas.delete('all')
+        self.computed = False
 
     def quit(self):
         sys.exit()
 
     def start_computing(self):
-        self.thread1 = threading.Thread(target=self.worker_thread)
-        self.thread1.start()
-        root.after(5, self.check_progress)
+
+        if not self.computed and len(self.points) > 0:
+            self.info_text.set("Computing...")
+            self.thread1 = threading.Thread(target=self.worker_thread)
+            self.thread1.start()
+            root.after(5, self.check_progress)
+        elif len(self.points) == 0:
+            tkMessageBox.showerror(message="Add points!")
+        else:
+            tkMessageBox.showerror(message="Clear canvas!")
 
     def worker_thread(self):
-        self.queue.put('Started computing...')
-        time.sleep(10)
-
+        # self.wait("Computing...")
+        self.compute_steiner_tree()
         self.queue.put(self.lock_object)
 
     def check_progress(self):
@@ -195,18 +240,21 @@ class TOPTGui(Frame):
         except Queue.Empty:
             root.after(5, self.check_progress)
 
-    def start_computing(self):
-        graph = TOPTGraph()
-        olt_point = self.points[self.olt_point_id]
-        graph.add_node_with_position(olt_point.id, olt_point.x, olt_point.y)
-        for id, point in self.points.items():
-            if (id != olt_point.id):
-                graph.add_node_with_position(id, point.x, point.y)
-                graph.add_euclidian_edge(olt_point.id, id)
-        steiner = SteinerTree()
-        solution, cost = steiner.find_steiner_tree(graph)
-        self.add_terminal_points(solution)
-        self.draw_edges(solution.edges())
+    def compute_steiner_tree(self):
+        if len(self.points) > 0:
+            self.computed = True
+            graph = TOPTGraph()
+            olt_point = self.points[self.olt_point_id]
+            graph.add_node_with_position(olt_point.id, olt_point.x, olt_point.y)
+            for id, point in self.points.items():
+                if (id != olt_point.id):
+                    graph.add_node_with_position(id, point.x, point.y)
+                    graph.add_euclidian_edge(olt_point.id, id)
+            steiner = SteinerTree()
+            solution, cost = steiner.find_steiner_tree(graph)
+            self.add_terminal_points(solution)
+            self.draw_edges(solution.edges())
+            self.info_text.set("Final cost: " + str(round(cost, 3)))
 
     def add_terminal_points(self, solution):
         for node_id in solution.nodes():
@@ -227,5 +275,6 @@ class TOPTGui(Frame):
 
 if __name__ == "__main__":
     root = Tk()
+    root.wm_title("TOPT PON")
     gui = TOPTGui(root)
     root.mainloop()
