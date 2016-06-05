@@ -215,9 +215,7 @@ class SteinerTree:
         for edge in graph.edge.iteritems():
             print edge
             if re.search('F\(', edge[0]) and len(edge[1]) == 2:
-                print 'END'
-                return edge[0], (edge[1].keys()[0], edge[1].keys()[1]),
-        print 'END NONE'
+                return edge[0], (edge[1].keys()[0], edge[1].keys()[1])
         return None, None
 
     def __get_random_solution(self, solutions):
